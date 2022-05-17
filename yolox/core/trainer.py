@@ -12,7 +12,6 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 
 from yolox.data import DataPrefetcher
-from yolox.exp import Exp
 from yolox.utils import (
     MeterBuffer,
     ModelEMA,
@@ -34,7 +33,7 @@ from yolox.utils import (
 
 
 class Trainer:
-    def __init__(self, exp: Exp, args):
+    def __init__(self, exp, args):
         # init function only defines some basic attr, other attrs like model, optimizer are built in
         # before_train methods.
         self.exp = exp
@@ -105,6 +104,7 @@ class Trainer:
             outputs = self.model(inps, targets)
 
         loss = outputs["total_loss"]
+        self.tblogger.add_scalar("Loss/train", loss, self.progress_in_iter + 1)
 
         self.optimizer.zero_grad()
         self.scaler.scale(loss).backward()
@@ -115,6 +115,8 @@ class Trainer:
             self.ema_model.update(self.model)
 
         lr = self.lr_scheduler.update_lr(self.progress_in_iter + 1)
+        self.tblogger.add_scalar("LR/iter", lr, self.progress_in_iter + 1)
+
         for param_group in self.optimizer.param_groups:
             param_group["lr"] = lr
 
