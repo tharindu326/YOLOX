@@ -119,23 +119,29 @@ def warm_cos_lr(lr, total_iters, warmup_total_iters, warmup_lr_start, iters):
 
 
 def yolox_warm_cos_lr(
-    lr,
-    min_lr_ratio,
-    total_iters,
-    warmup_total_iters,
-    warmup_lr_start,
-    no_aug_iter,
-    iters,
+    lr,                     # basic_lr_per_img * batch_size
+    min_lr_ratio,           # from config,  else 0.2
+    total_iters,            # total_epochs * iterations_per_epoch ; where iterations_per_epoch = training_loader_images/batch_size
+    warmup_total_iters,     # warmup_epochs * iterations_per_epoch
+    warmup_lr_start,        # from config,  lese 0
+    no_aug_iter,            # no_aug_epochs * iterations_per_epoch
+    iters,                  # current iteration
 ):
     """Cosine learning rate with warm up."""
     min_lr = lr * min_lr_ratio
+    # from iteration 0 to burn_in/warmup_total_iters LR will increase according to the function. This is quite similar to the YOLO V4
+    # In our case: from 0 ---> 5 epoch
     if iters <= warmup_total_iters:
-        # lr = (lr - warmup_lr_start) * iters / float(warmup_total_iters) + warmup_lr_start
-        lr = (lr - warmup_lr_start) * pow(
-            iters / float(warmup_total_iters), 2
-        ) + warmup_lr_start
+        lr = (lr - warmup_lr_start) * pow(iters / float(warmup_total_iters), 2) + warmup_lr_start  # in YOLOV4 power is 4 not 2
+
+    # if there is no_aug_iter(number of iterations to run without misic augmentation), the learning rate will be min_lr; (basic_lr_per_img * batch_size * ) for last no_aug_iter number of iterations.
+    # In our case: from 5 ---> 10 epoch, LR will be 0.05 since no_aug_epochs = 5
+    # this can be caused for lower precision since no augmentations
     elif iters >= total_iters - no_aug_iter:
         lr = min_lr
+
+    # otherwise, inbetween start of burnin_iteration/warmup_iteration and start of no_aug_iteration, LR will be behaved as follow
+    # in our case: don't go for this çase since warmup_epoch and (total_epoch - no_aug_epoch) are both equal to 5
     else:
         lr = min_lr + 0.5 * (lr - min_lr) * (
             1.0
