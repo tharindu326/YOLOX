@@ -89,6 +89,16 @@ class LRScheduler:
             ]
             gamma = getattr(self, "gamma", 0.1)
             lr_func = partial(multistep_lr, self.lr, milestones, gamma)
+
+        elif name == "multistep_warmup":  # stepwise lr schedule
+            warmup_total_iters = self.iters_per_epoch * self.warmup_epochs
+            warmup_lr_start = getattr(self, "warmup_lr_start", 0)
+            milestones = [
+                int(self.total_iters * milestone / self.total_epochs)
+                for milestone in self.milestones
+            ]
+            gamma = getattr(self, "gamma", 0.1)
+            lr_func = partial(multistep_lr_warmup, self.lr, milestones, gamma, warmup_total_iters, warmup_lr_start)
         else:
             raise ValueError("Scheduler version {} not supported.".format(name))
         return lr_func
@@ -208,4 +218,14 @@ def multistep_lr(lr, milestones, gamma, iters):
     """MultiStep learning rate"""
     for milestone in milestones:
         lr *= gamma if iters >= milestone else 1.0
+    return lr
+
+
+def multistep_lr_warmup(lr, milestones, gamma, iters, warmup_total_iters, warmup_lr_start):
+    if iters <= warmup_total_iters:
+        lr = (lr - warmup_lr_start) * pow(iters / float(warmup_total_iters), 2) + warmup_lr_start  # in YOLOV4 power is 4 not 2
+    else:
+        """MultiStep learning rate"""
+        for milestone in milestones:
+            lr *= gamma if iters >= milestone else 1.0
     return lr
